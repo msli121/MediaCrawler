@@ -7,7 +7,7 @@ set "REPO_PATH=C:\Users\Administrator\Desktop\MediaCrawler"
 REM 判断文件夹是否存在
 if exist "%REPO_PATH%" (
     REM 获取最新代码
-    cd "%REPO_PARENT_PATH%"
+    cd "%REPO_PATH%"
     git pull
 ) else (
     REM 文件夹不存在，进入上级目录并克隆仓库
