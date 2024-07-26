@@ -37,7 +37,7 @@ if "%1" == "start" (
     call :start_app
     exit /b 0
 ) else (
-    echo Usage: %0 {start|stop|restart}
+    echo "Unsupported CMD. Usage: run.bat {start|stop|restart}"
     exit /b 1
 )
 
@@ -74,7 +74,7 @@ goto :eof
 
 REM 函数来启动应用程序
 :start_app
-start /b python run.py > output.log 2>&1
+start /b python api_server.py > output.log 2>&1
 if %errorlevel% neq 0 (
     echo Failed to start application.
     exit /b 1
