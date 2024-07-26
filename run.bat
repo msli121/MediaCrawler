@@ -11,7 +11,7 @@ if exist "%REPO_PATH%" (
     git pull
 ) else (
     REM 文件夹不存在，进入上级目录并克隆仓库
-    cd REPO_PARENT_PATH
+    cd "%REPO_PARENT_PATH%"
     git clone https://github.com/msli121/MediaCrawler.git
     cd MediaCrawler
 )
@@ -37,7 +37,7 @@ if %errorlevel% neq 0 (
 REM 激活环境
 call conda activate media-crawler
 if %errorlevel% neq 0 (
-    @REM call conda init cmd.exe
+    call conda init cmd.exe
     call conda activate media-crawler
 )
 
@@ -47,6 +47,7 @@ REM 安装依赖包
 pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 echo Dependencies have been installed.
 
+REM 返回主流程
 goto :eof
 
 REM 函数来启动应用程序
@@ -54,6 +55,8 @@ REM 函数来启动应用程序
 start /b python run.py > output.log 2>&1
 echo %errorlevel% > app.pid
 echo Run server successfully. Check 'output.log' for details.
+
+REM 返回主流程
 goto :eof
 
 REM 函数来停止应用程序
@@ -65,6 +68,8 @@ if exist app.pid (
 ) else (
     echo No application is running.
 )
+
+REM 返回主流程
 goto :eof
 
 REM 解析命令行参数
