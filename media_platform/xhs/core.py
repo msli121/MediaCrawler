@@ -30,6 +30,84 @@ class XiaoHongShuCrawler(AbstractCrawler):
         # self.user_agent = utils.get_user_agent()
         self.user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
+    # 校验登录状态
+    async def check_login_status(self) -> bool:
+        playwright_proxy_format, httpx_proxy_format = None, None
+        if config.ENABLE_IP_PROXY:
+            ip_proxy_pool = await create_ip_pool(config.IP_PROXY_POOL_COUNT, enable_validate_ip=True)
+            ip_proxy_info: IpInfoModel = await ip_proxy_pool.get_proxy()
+            playwright_proxy_format, httpx_proxy_format = self.format_proxy_info(ip_proxy_info)
+        try:
+            async with async_playwright() as playwright:
+                # Launch a browser context.
+                chromium = playwright.chromium
+                self.browser_context = await self.launch_browser(
+                    chromium,
+                    None,
+                    self.user_agent,
+                    headless=config.HEADLESS
+                )
+                # stealth.min.js is a js script to prevent the website from detecting the crawler.
+                await self.browser_context.add_init_script(path="libs/stealth.min.js")
+                # add a cookie attribute webId to avoid the appearance of a sliding captcha on the webpage
+                await self.browser_context.add_cookies([{
+                    'name': "webId",
+                    'value': "xxx123",  # any value
+                    'domain': ".xiaohongshu.com",
+                    'path': "/"
+                }])
+                self.context_page = await self.browser_context.new_page()
+                await self.context_page.goto(self.index_url)
+
+                # Create a client to interact with the xiaohongshu website.
+                self.xhs_client = await self.create_xhs_client(httpx_proxy_format)
+                return await self.xhs_client.pong()
+        except Exception as e:
+            utils.logger.error(f"Check login status failed: {e}")
+            return False
+
+    # 开始登录
+    async def login(self) -> None:
+        playwright_proxy_format, httpx_proxy_format = None, None
+        if config.ENABLE_IP_PROXY:
+            ip_proxy_pool = await create_ip_pool(config.IP_PROXY_POOL_COUNT, enable_validate_ip=True)
+            ip_proxy_info: IpInfoModel = await ip_proxy_pool.get_proxy()
+            playwright_proxy_format, httpx_proxy_format = self.format_proxy_info(ip_proxy_info)
+        async with async_playwright() as playwright:
+            # Launch a browser context.
+            chromium = playwright.chromium
+            self.browser_context = await self.launch_browser(
+                chromium,
+                None,
+                self.user_agent,
+                headless=config.HEADLESS
+            )
+            # stealth.min.js is a js script to prevent the website from detecting the crawler.
+            await self.browser_context.add_init_script(path="libs/stealth.min.js")
+            # add a cookie attribute webId to avoid the appearance of a sliding captcha on the webpage
+            await self.browser_context.add_cookies([{
+                'name': "webId",
+                'value': "xxx123",  # any value
+                'domain': ".xiaohongshu.com",
+                'path': "/"
+            }])
+            self.context_page = await self.browser_context.new_page()
+            await self.context_page.goto(self.index_url)
+
+            # Create a client to interact with the xiaohongshu website.
+            self.xhs_client = await self.create_xhs_client(httpx_proxy_format)
+            if not await self.xhs_client.pong():
+                login_obj = XiaoHongShuLogin(
+                    login_type=config.LOGIN_TYPE,
+                    login_phone="",  # input your phone number
+                    browser_context=self.browser_context,
+                    context_page=self.context_page,
+                    cookie_str=config.COOKIES
+                )
+                await login_obj.begin()
+                await self.xhs_client.update_cookies(browser_context=self.browser_context)
+
+
     async def start(self) -> None:
         playwright_proxy_format, httpx_proxy_format = None, None
         if config.ENABLE_IP_PROXY:
