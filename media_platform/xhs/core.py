@@ -142,20 +142,24 @@ class XiaoHongShuCrawler(AbstractCrawler):
         """Get creator's notes and retrieve their comment information."""
         utils.logger.info("[XiaoHongShuCrawler.get_creators_and_notes] Begin get xiaohongshu creators")
         for user_id in config.XHS_CREATOR_ID_LIST:
-            # get creator detail info from web html content
-            createor_info: Dict = await self.xhs_client.get_creator_info(user_id=user_id)
-            if createor_info:
-                await xhs_store.save_creator(user_id, creator=createor_info)
+            try:
+                # get creator detail info from web html content
+                createor_info: Dict = await self.xhs_client.get_creator_info(user_id=user_id)
+                if createor_info:
+                    await xhs_store.save_creator(user_id, creator=createor_info)
 
-            # Get all note information of the creator
-            all_notes_list = await self.xhs_client.get_all_notes_by_creator(
-                user_id=user_id,
-                crawl_interval=random.random(),
-                callback=self.fetch_creator_notes_detail
-            )
+                # Get all note information of the creator
+                all_notes_list = await self.xhs_client.get_all_notes_by_creator(
+                    user_id=user_id,
+                    crawl_interval=random.random(),
+                    callback=self.fetch_creator_notes_detail
+                )
 
-            note_ids = [note_item.get("note_id") for note_item in all_notes_list]
-            await self.batch_get_note_comments(note_ids)
+                note_ids = [note_item.get("note_id") for note_item in all_notes_list]
+                await self.batch_get_note_comments(note_ids)
+            except Exception as e:
+                utils.logger.error(f"[查询个人笔记失败] user_id: {user_id}, error: {e}")
+                config.XHS_CREATOR_ERROR_USER_INFO[user_id] = str(e)
 
     async def fetch_creator_notes_detail(self, note_list: List[Dict]):
         """
@@ -164,7 +168,7 @@ class XiaoHongShuCrawler(AbstractCrawler):
         semaphore = asyncio.Semaphore(config.MAX_CONCURRENCY_NUM)
         task_list = [
             self.get_note_detail(
-                note_id=post_item.get("id"),
+                note_id=post_item.get("id") or post_item.get("note_id"),
                 xsec_source=post_item.get("xsec_source"),
                 xsec_token=post_item.get("xsec_token"),
                 semaphore=semaphore

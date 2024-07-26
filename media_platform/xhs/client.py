@@ -403,14 +403,16 @@ class XiaoHongShuClient(AbstractApiClient):
         result = []
         notes_has_more = True
         notes_cursor = ""
+        page_size = 20
         while notes_has_more:
-            notes_res = await self.get_notes_by_creator(user_id, notes_cursor)
+            notes_res = await self.get_notes_by_creator(user_id, notes_cursor, page_size)
             if not notes_res:
                 utils.logger.error(
                     f"[XiaoHongShuClient.get_notes_by_creator] The current creator may have been banned by xhs, so they cannot access the data.")
                 break
-
-            notes_has_more = notes_res.get("has_more", False)
+            # 最多抓取 page_size 个
+            notes_has_more = False
+            # notes_has_more = notes_res.get("has_more", False)
             notes_cursor = notes_res.get("cursor", "")
             if "notes" not in notes_res:
                 utils.logger.info(
