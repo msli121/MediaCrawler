@@ -403,7 +403,7 @@ class XiaoHongShuClient(AbstractApiClient):
         result = []
         notes_has_more = True
         notes_cursor = ""
-        page_size = 20
+        page_size = 10
         while notes_has_more:
             notes_res = await self.get_notes_by_creator(user_id, notes_cursor, page_size)
             if not notes_res:
