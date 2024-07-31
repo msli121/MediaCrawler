@@ -23,23 +23,13 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-REM 解析命令行参数
-if "%1" == "start" (
-    call :setup_env
-    call :start_app
-    exit /b 0
-) else if "%1" == "stop" (
-    call :stop_app
-    exit /b 0
-) else if "%1" == "restart" (
-    call :stop_app
-    call :setup_env
-    call :start_app
-    exit /b 0
-) else (
-    echo "Unsupported CMD. Usage: run.bat {start|stop|restart}"
+REM 设置和激活conda环境
+call :setup_env
+if %errorlevel% neq 0 (
     exit /b 1
 )
+call :start_app
+exit /b 0
 
 REM 函数来创建和激活conda环境
 :setup_env
@@ -74,30 +64,11 @@ goto :eof
 
 REM 函数来启动应用程序
 :start_app
-start /b python api_server.py > output.log 2>&1
+python api_server.py
 if %errorlevel% neq 0 (
     echo Failed to start application.
     exit /b 1
 )
-echo %errorlevel% > app.pid
-echo Run server successfully. Check 'output.log' for details.
-REM 返回主流程
-goto :eof
-
-REM 函数来停止应用程序
-:stop_app
-if exist app.pid (
-    for /f %%i in (app.pid) do (
-        taskkill /PID %%i
-        if %errorlevel% neq 0 (
-            echo Failed to stop application with PID %%i.
-            exit /b 1
-        )
-    )
-    del app.pid
-    echo The application has been stopped.
-) else (
-    echo No application is running.
-)
+echo Run server successfully.
 REM 返回主流程
 goto :eof
