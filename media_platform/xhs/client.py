@@ -1,5 +1,6 @@
 import asyncio
 import json
+import random
 import re
 from typing import Any, Callable, Dict, List, Optional, Union
 from urllib.parse import urlencode
@@ -67,7 +68,7 @@ class XiaoHongShuClient(AbstractApiClient):
         self.headers.update(headers)
         return self.headers
 
-    @retry(stop=stop_after_attempt(3), wait=wait_fixed(1))
+    @retry(stop=stop_after_attempt(2), wait=wait_fixed(3))
     async def request(self, method, url, **kwargs) -> Union[str, Any]:
         """
         封装httpx的公共请求方法，对请求响应做一些处理
@@ -81,13 +82,17 @@ class XiaoHongShuClient(AbstractApiClient):
         """
         # return response.text
         return_response = kwargs.pop('return_response', False)
-
+        # 随机停止
+        # api/sns/web/v1/feed 查询笔记互动数据
+        if "api/sns/web/v1/feed" in url:
+            await asyncio.sleep(random.randint(1, 2))
+        elif "api/sns/web/v1/user_posted" in url:  # 查询指定用户已发布的笔记
+            await asyncio.sleep(random.randint(1, 2))
         async with httpx.AsyncClient(proxies=self.proxies) as client:
             response = await client.request(
                 method, url, timeout=self.timeout,
                 **kwargs
             )
-
         if return_response:
             return response.text
         data: Dict = response.json()
@@ -456,6 +461,7 @@ class XiaoHongShuClient(AbstractApiClient):
         Returns:
 
         """
+
         def camel_to_underscore(key):
             return re.sub(r"(?<!^)(?=[A-Z])", "_", key).lower()
 
