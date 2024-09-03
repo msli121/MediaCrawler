@@ -93,7 +93,7 @@ class XiaoHongShuCrawler(AbstractCrawler):
                 'path': "/"
             }])
             self.context_page = await self.browser_context.new_page()
-            await self.context_page.goto(self.index_url)
+            await self.context_page.goto(self.index_url, timeout=60000)
 
             # Create a client to interact with the xiaohongshu website.
             self.xhs_client = await self.create_xhs_client(httpx_proxy_format)
