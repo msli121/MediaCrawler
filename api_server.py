@@ -246,4 +246,4 @@ if __name__ == "__main__":
     # init oss
     # init_oss(access_key_id=config.OSS_ACCESS_KEY_ID, access_key_secret=config.OSS_ACCESS_KEY_SECRET)
     # 启动应用
-    uvicorn.run(app, host="127.0.0.1", port=11086, timeout_keep_alive=7200, lifespan='on')
+    uvicorn.run(app, host="0.0.0.0", port=11086, timeout_keep_alive=7200, lifespan='on')
