@@ -82,7 +82,7 @@ class XiaoHongShuClient(AbstractApiClient):
         """
         # return response.text
         return_response = kwargs.pop('return_response', False)
-        # 随机停止
+        # 特定接口 随机停止
         # api/sns/web/v1/feed 查询笔记互动数据
         if "api/sns/web/v1/feed" in url:
             await asyncio.sleep(random.randint(1, 2))
