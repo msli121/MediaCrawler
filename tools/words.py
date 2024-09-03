@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from collections import Counter
 
 import aiofiles
@@ -14,6 +15,7 @@ plot_lock = asyncio.Lock()
 
 class AsyncWordCloudGenerator:
     def __init__(self):
+        logging.getLogger('jieba').setLevel(logging.WARNING)
         self.stop_words_file = config.STOP_WORDS_FILE
         self.lock = asyncio.Lock()
         self.stop_words = self.load_stop_words()
@@ -27,7 +29,7 @@ class AsyncWordCloudGenerator:
 
     async def generate_word_frequency_and_cloud(self, data, save_words_prefix):
         all_text = ' '.join(item['content'] for item in data)
-        words = [word for word in jieba.lcut(all_text) if word not in self.stop_words]
+        words = [word for word in jieba.lcut(all_text) if word not in self.stop_words and len(word.strip()) > 0]
         word_freq = Counter(words)
 
         # Save word frequency to file

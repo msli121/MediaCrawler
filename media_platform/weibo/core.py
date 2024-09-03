@@ -18,7 +18,7 @@ from base.base_crawler import AbstractCrawler
 from proxy.proxy_ip_pool import IpInfoModel, create_ip_pool
 from store import weibo as weibo_store
 from tools import utils
-from var import crawler_type_var
+from var import crawler_type_var, source_keyword_var
 
 from .client import WeiboClient
 from .exception import DataFetchError
@@ -69,8 +69,6 @@ class WeiboCrawler(AbstractCrawler):
                     context_page=self.context_page,
                     cookie_str=config.COOKIES
                 )
-                await self.context_page.goto(self.index_url)
-                await asyncio.sleep(1)
                 await login_obj.begin()
 
                 # 登录成功后重定向到手机端的网站，再更新手机端登录成功的cookie
@@ -86,6 +84,9 @@ class WeiboCrawler(AbstractCrawler):
             elif config.CRAWLER_TYPE == "detail":
                 # Get the information and comments of the specified post
                 await self.get_specified_notes()
+            elif config.CRAWLER_TYPE == "creator":
+                # Get creator's information and their notes and comments
+                await self.get_creators_and_notes()
             else:
                 pass
             utils.logger.info("[WeiboCrawler.start] Weibo Crawler finished ...")
@@ -101,6 +102,7 @@ class WeiboCrawler(AbstractCrawler):
             config.CRAWLER_MAX_NOTES_COUNT = weibo_limit_count
         start_page = config.START_PAGE
         for keyword in config.KEYWORDS.split(","):
+            source_keyword_var.set(keyword)
             utils.logger.info(f"[WeiboCrawler.search] Current search keyword: {keyword}")
             page = 1
             while (page - start_page + 1) * weibo_limit_count <= config.CRAWLER_MAX_NOTES_COUNT:
@@ -192,7 +194,7 @@ class WeiboCrawler(AbstractCrawler):
                 utils.logger.info(f"[WeiboCrawler.get_note_comments] begin get note_id: {note_id} comments ...")
                 await self.wb_client.get_note_all_comments(
                     note_id=note_id,
-                    crawl_interval=random.randint(1,10), # 微博对API的限流比较严重，所以延时提高一些
+                    crawl_interval=random.randint(1,3), # 微博对API的限流比较严重，所以延时提高一些
                     callback=weibo_store.batch_update_weibo_note_comments
                 )
             except DataFetchError as ex:
@@ -221,6 +223,41 @@ class WeiboCrawler(AbstractCrawler):
             if content != None:
                 extension_file_name = url.split(".")[-1]
                 await weibo_store.update_weibo_note_image(pic["pid"], content, extension_file_name)
+
+
+    async def get_creators_and_notes(self) -> None:
+        """
+        Get creator's information and their notes and comments
+        Returns:
+
+        """
+        utils.logger.info("[WeiboCrawler.get_creators_and_notes] Begin get weibo creators")
+        for user_id in config.WEIBO_CREATOR_ID_LIST:
+            createor_info_res: Dict = await self.wb_client.get_creator_info_by_id(creator_id=user_id)
+            if createor_info_res:
+                createor_info: Dict = createor_info_res.get("userInfo", {})
+                utils.logger.info(f"[WeiboCrawler.get_creators_and_notes] creator info: {createor_info}")
+                if not createor_info:
+                    raise DataFetchError("Get creator info error")
+                await weibo_store.save_creator(user_id, user_info=createor_info)
+
+                # Get all note information of the creator
+                all_notes_list = await self.wb_client.get_all_notes_by_creator_id(
+                    creator_id=user_id,
+                    container_id=createor_info_res.get("lfid_container_id"),
+                    crawl_interval=0,
+                    callback=weibo_store.batch_update_weibo_notes
+                )
+
+                note_ids = [note_item.get("mlog", {}).get("id") for note_item in all_notes_list if
+                            note_item.get("mlog", {}).get("id")]
+                await self.batch_get_notes_comments(note_ids)
+
+            else:
+                utils.logger.error(
+                    f"[WeiboCrawler.get_creators_and_notes] get creator info error, creator_id:{user_id}")
+
+
 
     async def create_weibo_client(self, httpx_proxy: Optional[str]) -> WeiboClient:
         """Create xhs client"""
