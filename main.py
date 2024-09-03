@@ -33,7 +33,7 @@ class CrawlerFactory:
 
 async def main():
     # parse cmd
-    await cmd_arg.parse_cmd()
+    cmd_arg.parse_cmd()
 
     # init db
     if config.SAVE_DATA_OPTION == "db":
@@ -45,7 +45,6 @@ async def main():
     if config.SAVE_DATA_OPTION == "db":
         await db.close()
 
-    
 
 if __name__ == '__main__':
     try:

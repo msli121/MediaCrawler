@@ -36,7 +36,7 @@ setup_conda_env() {
 
 # 函数来启动应用程序
 start_app() {
-    nohup python run.py > output.log 2>&1 &
+    nohup python api_server.py > output.log 2>&1 &
     echo $! > app.pid
     echo "Run server successfully. Check 'output.log' for details."
 }
