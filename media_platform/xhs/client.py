@@ -85,9 +85,9 @@ class XiaoHongShuClient(AbstractApiClient):
         # 特定接口 随机停止
         # api/sns/web/v1/feed 查询笔记互动数据
         if "api/sns/web/v1/feed" in url:
-            await asyncio.sleep(random.uniform(0.8, 2.0))
+            await asyncio.sleep(random.uniform(0.8, 1.5))
         elif "api/sns/web/v1/user_posted" in url:  # 查询指定用户已发布的笔记
-            await asyncio.sleep(random.uniform(0.8, 2.0))
+            await asyncio.sleep(random.uniform(0.8, 1.5))
         async with httpx.AsyncClient(proxies=self.proxies) as client:
             response = await client.request(
                 method, url, timeout=self.timeout,
