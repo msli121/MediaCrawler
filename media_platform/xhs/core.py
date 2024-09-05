@@ -27,9 +27,13 @@ class XiaoHongShuCrawler(AbstractCrawler):
     browser_context: BrowserContext
 
     def __init__(self) -> None:
+        self.username = "user_data_dir"
         self.index_url = "https://www.xiaohongshu.com"
         # self.user_agent = utils.get_user_agent()
         self.user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+
+    def set_username(self, username: str):
+        self.username = username
 
     # 校验登录状态
     async def check_login_status(self) -> bool:
@@ -46,7 +50,8 @@ class XiaoHongShuCrawler(AbstractCrawler):
                     chromium,
                     None,
                     self.user_agent,
-                    headless=config.HEADLESS
+                    headless=config.HEADLESS,
+                    username=self.username,
                 )
                 # stealth.min.js is a js script to prevent the website from detecting the crawler.
                 await self.browser_context.add_init_script(path="libs/stealth.min.js")
@@ -81,7 +86,8 @@ class XiaoHongShuCrawler(AbstractCrawler):
                 chromium,
                 None,
                 self.user_agent,
-                headless=config.HEADLESS
+                headless=config.HEADLESS,
+                username=self.username,
             )
             # stealth.min.js is a js script to prevent the website from detecting the crawler.
             await self.browser_context.add_init_script(path="libs/stealth.min.js")
@@ -108,7 +114,6 @@ class XiaoHongShuCrawler(AbstractCrawler):
                 await login_obj.begin()
                 await self.xhs_client.update_cookies(browser_context=self.browser_context)
 
-
     async def start(self) -> None:
         playwright_proxy_format, httpx_proxy_format = None, None
         if config.ENABLE_IP_PROXY:
@@ -123,7 +128,8 @@ class XiaoHongShuCrawler(AbstractCrawler):
                 chromium,
                 None,
                 self.user_agent,
-                headless=config.HEADLESS
+                headless=config.HEADLESS,
+                username=self.username,
             )
             # stealth.min.js is a js script to prevent the website from detecting the crawler.
             await self.browser_context.add_init_script(path="libs/stealth.min.js")
@@ -221,8 +227,12 @@ class XiaoHongShuCrawler(AbstractCrawler):
     async def get_creators_and_notes(self) -> None:
         """Get creator's notes and retrieve their comment information."""
         utils.logger.info("[XiaoHongShuCrawler.get_creators_and_notes] Begin get xiaohongshu creators")
+        index = 1
         for user_id in config.XHS_CREATOR_ID_LIST:
             try:
+                utils.logger.info(
+                    f"[获取用户信息和笔记详情] 当前使用的小红书账号:{self.username}，正在处理第{index}个账号，本批共{len(config.XHS_CREATOR_ID_LIST)}个账号")
+                index += 1
                 # get creator detail info from web html content
                 createor_info: Dict = await self.xhs_client.get_creator_info(user_id=user_id)
                 if createor_info:
@@ -232,14 +242,25 @@ class XiaoHongShuCrawler(AbstractCrawler):
                 all_notes_list = await self.xhs_client.get_all_notes_by_creator(
                     user_id=user_id,
                     crawl_interval=random.random(),
-                    callback=self.fetch_creator_notes_detail
+                    callback=self.fetch_creator_notes_detail_sync
                 )
 
                 note_ids = [note_item.get("note_id") for note_item in all_notes_list]
                 await self.batch_get_note_comments(note_ids)
             except Exception as e:
-                utils.logger.error(f"[查询个人笔记失败] user_id: {user_id}, error: {e}")
+                utils.logger.error(f"[查询个人笔记失败] 登录账号：{self.username}, 查询账号: {user_id}, error: {e}")
                 config.XHS_CREATOR_ERROR_USER_INFO[user_id] = str(e)
+
+    async def fetch_creator_notes_detail_sync(self, note_list: List[Dict]):
+        """同步获取笔记详情"""
+        for post_item in note_list:
+            note_detail = await self.get_note_detail_sync_task(
+                note_id=post_item.get("note_id"),
+                xsec_source=post_item.get("xsec_source"),
+                xsec_token=post_item.get("xsec_token"),
+            )
+            if note_detail:
+                await xhs_store.update_xhs_note(note_detail)
 
     async def fetch_creator_notes_detail(self, note_list: List[Dict]):
         """
@@ -297,7 +318,34 @@ class XiaoHongShuCrawler(AbstractCrawler):
                 await xhs_store.update_xhs_note(note_detail)
         await self.batch_get_note_comments(need_get_comment_note_ids)
 
-    async def get_note_detail_async_task(self, note_id: str, xsec_source: str, xsec_token: str, semaphore: asyncio.Semaphore) -> \
+    # 同步获取获取笔记详情
+    async def get_note_detail_sync_task(self, note_id: str, xsec_source: str, xsec_token: str) -> Optional[Dict]:
+        try:
+            note_detail: Dict = await self.xhs_client.get_note_by_id_from_html(note_id)
+            if not note_detail:
+                note_detail: Dict = await self.xhs_client.get_note_by_id(note_id, xsec_source, xsec_token)
+            else:
+                # 暂停0.5秒
+                await asyncio.sleep(0.5)
+            if not note_detail:
+                utils.logger.error(
+                    f"[XiaoHongShuCrawler.get_note_detail_sync_task] Get note detail error, note_id: {note_id}")
+                return None
+            note_detail.update({"xsec_token": xsec_token, "xsec_source": xsec_source})
+            return note_detail
+        except DataFetchError as ex:
+            utils.logger.error(f"[XiaoHongShuCrawler.get_note_detail_sync_task] Get note detail error: {ex}")
+            return None
+        except KeyError as ex:
+            utils.logger.error(
+                f"[XiaoHongShuCrawler.get_note_detail_sync_task] have not fund note detail note_id:{note_id}, err: {ex}")
+            return None
+        except Exception as e:
+            utils.logger.error(f"[查询笔记详情失败] note_id:{note_id}, error: {e}")
+            return None
+
+    async def get_note_detail_async_task(self, note_id: str, xsec_source: str, xsec_token: str,
+                                         semaphore: asyncio.Semaphore) -> \
             Optional[Dict]:
         """Get note detail"""
         async with semaphore:
@@ -379,7 +427,8 @@ class XiaoHongShuCrawler(AbstractCrawler):
             chromium: BrowserType,
             playwright_proxy: Optional[Dict],
             user_agent: Optional[str],
-            headless: bool = True
+            headless: bool = True,
+            username: Optional[str] = 'user_data_dir',
     ) -> BrowserContext:
         """Launch browser and create browser context"""
         utils.logger.info("[XiaoHongShuCrawler.launch_browser] Begin create browser context ...")
@@ -387,7 +436,7 @@ class XiaoHongShuCrawler(AbstractCrawler):
             # feat issue #14
             # we will save login state to avoid login every time
             user_data_dir = os.path.join(os.getcwd(), "browser_data",
-                                         config.USER_DATA_DIR % config.PLATFORM)  # type: ignore
+                                         f"xhs_{username}")  # type: ignore
             browser_context = await chromium.launch_persistent_context(
                 user_data_dir=user_data_dir,
                 accept_downloads=True,
