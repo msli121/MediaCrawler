@@ -321,12 +321,16 @@ class XiaoHongShuCrawler(AbstractCrawler):
     # 同步获取获取笔记详情
     async def get_note_detail_sync_task(self, note_id: str, xsec_source: str, xsec_token: str) -> Optional[Dict]:
         try:
-            note_detail: Dict = await self.xhs_client.get_note_by_id_from_html(note_id)
-            if not note_detail:
-                note_detail: Dict = await self.xhs_client.get_note_by_id(note_id, xsec_source, xsec_token)
+            # 随机使用html或者api获取笔记详情
+            if random.random() > 0.5:
+                note_detail: Dict = await self.xhs_client.get_note_by_id_from_html(note_id)
+                if not note_detail:
+                    note_detail: Dict = await self.xhs_client.get_note_by_id(note_id, xsec_source, xsec_token)
             else:
-                # 暂停0.5秒
-                await asyncio.sleep(0.5)
+                note_detail: Dict = await self.xhs_client.get_note_by_id(note_id, xsec_source, xsec_token)
+                if not note_detail:
+                    note_detail: Dict = await self.xhs_client.get_note_by_id_from_html(note_id)
+
             if not note_detail:
                 utils.logger.error(
                     f"[XiaoHongShuCrawler.get_note_detail_sync_task] Get note detail error, note_id: {note_id}")

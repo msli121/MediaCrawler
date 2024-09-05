@@ -492,6 +492,10 @@ class XiaoHongShuClient(AbstractApiClient):
                     dict_new[new_key] = value
             return dict_new
 
+        random_second = random.randint(1, 1)
+        utils.logger.info(f"[get_note_by_id_from_html] 暂停{random_second}秒")
+        await asyncio.sleep(random_second)
+
         url = "https://www.xiaohongshu.com/explore/" + note_id
         html = await self.request(method="GET", url=url, return_response=True, headers=self.headers)
         states = re.findall(r"window.__INITIAL_STATE__=({.*})</script>", html)

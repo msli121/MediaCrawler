@@ -153,7 +153,7 @@ async def login(login_info: XhsLoginInfo):
 async def handle_crawler_request(task_info: CrawlerTaskInfo):
     global CRAWLER_RUNNING, CRAWLER_RUNNING_TASK_ID, CRAWLER_RUNNING_XHS_USERNAME
     start_time = time.time()
-    utils.logger.info(f"执行小红书数据爬取任务：task_info: {task_info}")
+    utils.logger.info(f"【执行小红书数据爬取任务】task_info: {task_info}")
     if CRAWLER_RUNNING:
         msg = f"当前有任务正在执行，任务ID:{CRAWLER_RUNNING_TASK_ID}, 用户名：{CRAWLER_RUNNING_XHS_USERNAME}，请稍后再试!"
         utils.logger.warn(msg)
@@ -176,13 +176,15 @@ async def handle_crawler_request(task_info: CrawlerTaskInfo):
             "msg": "没有可用的小红书登录账号",
             "data": None
         }
+    utils.logger.info(
+        f"【执行小红书数据爬取任务】有效的小红书账号数：{len(valid_login_infos)}, 待抓取的账号数：{len(task_info.creatorIds)}")
     headless = task_info.headless
     # 保存抓取到的内容
     note_infos = []
     # 按note_id 去重
     note_ids = set()
 
-    batch_size = 10
+    batch_size = 5
     # 将creatorIds分成多个批次，每个批次最多20个
     for i in range(0, len(task_info.creatorIds), batch_size):
         # 本批次处理的creatorIds
@@ -196,7 +198,7 @@ async def handle_crawler_request(task_info: CrawlerTaskInfo):
         selected_index = (selected_index + 1) % len(valid_login_infos)
         selected_username = valid_login_infos[selected_index]['username']
         utils.logger.info(
-            f"【小红书数据爬取】使用的小红书账号：{selected_username} 本批次账号个数:{len(creator_ids)} 账号ID:{creator_ids}")
+            f"【小红书数据爬取】正在处理第{i // batch_size + 1}批，共{len(task_info.creatorIds) // batch_size}批，本批使用的登录账号：{selected_username}，本批待抓取的账号个数:{len(creator_ids)}，待抓取的账号ID:{creator_ids}")
         try:
             CRAWLER_RUNNING = True
             CRAWLER_RUNNING_TASK_ID = task_info.taskId
@@ -244,7 +246,13 @@ async def handle_crawler_request(task_info: CrawlerTaskInfo):
             utils.logger.error(f"小红书数据爬取失败: {e}")
             continue
     end_time = time.time()
-    utils.logger.info(f"小红书数据爬取完毕, 获取笔记总数：{len(note_infos)}, 总耗时：{end_time - start_time:.2f}秒")
+    elapsed_time = end_time - start_time
+    # 计算小时、分钟和秒
+    hours = int(elapsed_time // 3600)
+    minutes = int((elapsed_time % 3600) // 60)
+    seconds = int(elapsed_time % 60)
+    utils.logger.info(
+        f"【小红书数据爬取完毕】有效登录的小红书账号数：{len(valid_login_infos)}, 抓取数据的小红书账号数：{len(task_info.creatorIds)}，获取笔记总数：{len(note_infos)}, 总耗时：{hours}时{minutes}分{seconds}秒")
     CRAWLER_RUNNING = False
     return {
         "code": 0,
