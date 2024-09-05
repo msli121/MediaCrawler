@@ -68,7 +68,7 @@ class XiaoHongShuClient(AbstractApiClient):
         self.headers.update(headers)
         return self.headers
 
-    @retry(stop=stop_after_attempt(2), wait=wait_fixed(3))
+    # @retry(stop=stop_after_attempt(1), wait=wait_fixed(3))
     async def request(self, method, url, **kwargs) -> Union[str, Any]:
         """
         封装httpx的公共请求方法，对请求响应做一些处理
@@ -82,12 +82,19 @@ class XiaoHongShuClient(AbstractApiClient):
         """
         # return response.text
         return_response = kwargs.pop('return_response', False)
+
         # 特定接口 随机停止
         # api/sns/web/v1/feed 查询笔记互动数据
         if "api/sns/web/v1/feed" in url:
-            await asyncio.sleep(random.uniform(0.8, 1.5))
-        elif "api/sns/web/v1/user_posted" in url:  # 查询指定用户已发布的笔记
-            await asyncio.sleep(random.uniform(0.8, 1.5))
+            # random_second = random.uniform(0.8, 1.5)
+            random_second = random.randint(1, 1)
+            utils.logger.info(f"{url} 暂停{random_second}秒")
+            await asyncio.sleep(random_second)
+        # elif "api/sns/web/v1/user_posted" in url:  # 查询指定用户已发布的笔记
+        # random_second = random.uniform(0.8, 1.5)
+        # random_second = random.randint(1, 1)
+        # utils.logger.info(f"{url} 暂停{random_second}秒")
+        # await asyncio.sleep(random_second)
         async with httpx.AsyncClient(proxies=self.proxies) as client:
             response = await client.request(
                 method, url, timeout=self.timeout,
@@ -101,7 +108,7 @@ class XiaoHongShuClient(AbstractApiClient):
         elif data["code"] == self.IP_ERROR_CODE:
             raise IPBlockError(self.IP_ERROR_STR)
         else:
-            raise DataFetchError(data.get("msg", None))
+            raise Exception(data.get("msg", "数据获取失败"))
 
     async def get(self, uri: str, params=None) -> Dict:
         """
@@ -231,7 +238,7 @@ class XiaoHongShuClient(AbstractApiClient):
             res_dict: Dict = res["items"][0]["note_card"]
             return res_dict
         # 爬取频繁了可能会出现有的笔记能有结果有的没有
-        utils.logger.error(f"[XiaoHongShuClient.get_note_by_id] get note id:{note_id} empty and res:{res}")
+        utils.logger.info(f"[XiaoHongShuClient.get_note_by_id] get note id:{note_id} empty and res:{res}")
         return dict()
 
     async def get_note_comments(self, note_id: str, cursor: str = "") -> Dict:
@@ -449,7 +456,7 @@ class XiaoHongShuClient(AbstractApiClient):
         }
         return await self.post(uri, data=data, return_response=True)
 
-    @retry(stop=stop_after_attempt(3), wait=wait_fixed(1))
+    # @retry(stop=stop_after_attempt(3), wait=wait_fixed(1))
     async def get_note_by_id_from_html(self, note_id: str):
         """
         通过解析网页版的笔记详情页HTML，获取笔记详情, 该接口可能会出现失败的情况，这里尝试重试3次
@@ -487,7 +494,11 @@ class XiaoHongShuClient(AbstractApiClient):
 
         url = "https://www.xiaohongshu.com/explore/" + note_id
         html = await self.request(method="GET", url=url, return_response=True, headers=self.headers)
-        state = re.findall(r"window.__INITIAL_STATE__=({.*})</script>", html)[0].replace("undefined", '""')
+        states = re.findall(r"window.__INITIAL_STATE__=({.*})</script>", html)
+        if states is None or states == "{}" or len(states) == 0:
+            utils.logger.info(f"[get_note_by_id_from_html] note_id={note_id} Failed to get note from html.")
+            return None
+        state = states[0].replace("undefined", '""')
         if state != "{}":
             note_dict = transform_json_keys(state)
             return note_dict["note"]["note_detail_map"][note_id]["note"]
