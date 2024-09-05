@@ -1,6 +1,5 @@
 import json
 import os
-import shutil
 import time
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
@@ -12,11 +11,8 @@ from pydantic import BaseModel
 
 import cmd_arg
 import config
-from main import CrawlerFactory
 from media_platform.xhs import XiaoHongShuCrawler
 from tools import utils
-from utils.common_utils import delete_folder_contents, delete_local_file, extract_zip_to_folder
-from utils.oss_utils import upload_local_file_to_oss, download_file_from_oss
 
 app = FastAPI()
 
