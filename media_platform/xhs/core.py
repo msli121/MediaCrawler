@@ -94,7 +94,7 @@ class XiaoHongShuCrawler(AbstractCrawler):
             # add a cookie attribute webId to avoid the appearance of a sliding captcha on the webpage
             await self.browser_context.add_cookies([{
                 'name': "webId",
-                'value': "xxx123",  # any value
+                'value': self.username,  # any value
                 'domain': ".xiaohongshu.com",
                 'path': "/"
             }])
@@ -136,13 +136,24 @@ class XiaoHongShuCrawler(AbstractCrawler):
             # add a cookie attribute webId to avoid the appearance of a sliding captcha on the webpage
             await self.browser_context.add_cookies([{
                 'name': "webId",
-                'value': "xxx123",  # any value
+                'value': self.username,  # any value
                 'domain': ".xiaohongshu.com",
                 'path': "/"
             }])
             self.context_page = await self.browser_context.new_page()
             await self.context_page.goto(self.index_url, timeout=60000)
-            await asyncio.sleep(300)
+            # todo 打开页面最多停留5min，如果关闭了浏览器则直接退出
+            max_wait_time = 5 * 60  # 5 minutes in seconds
+            check_interval = 2  # Check every 10 seconds
+            time_waited = 0
+            while time_waited < max_wait_time:
+                if self.context_page.is_closed():
+                    utils.logger.info("Browser closed. Exiting.")
+                    return
+                await asyncio.sleep(check_interval)
+                time_waited += check_interval
+            utils.logger.info("Max wait time reached. Closing browser.")
+            await self.browser_context.close()
 
     async def start(self) -> None:
         playwright_proxy_format, httpx_proxy_format = None, None
