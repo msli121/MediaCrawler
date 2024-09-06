@@ -114,6 +114,36 @@ class XiaoHongShuCrawler(AbstractCrawler):
                 await login_obj.begin()
                 await self.xhs_client.update_cookies(browser_context=self.browser_context)
 
+    # 打开页面最多停留5min
+    async def open_web(self) -> None:
+        playwright_proxy_format, httpx_proxy_format = None, None
+        if config.ENABLE_IP_PROXY:
+            ip_proxy_pool = await create_ip_pool(config.IP_PROXY_POOL_COUNT, enable_validate_ip=True)
+            ip_proxy_info: IpInfoModel = await ip_proxy_pool.get_proxy()
+            playwright_proxy_format, httpx_proxy_format = self.format_proxy_info(ip_proxy_info)
+        async with async_playwright() as playwright:
+            # Launch a browser context.
+            chromium = playwright.chromium
+            self.browser_context = await self.launch_browser(
+                chromium,
+                None,
+                self.user_agent,
+                headless=config.HEADLESS,
+                username=self.username,
+            )
+            # stealth.min.js is a js script to prevent the website from detecting the crawler.
+            await self.browser_context.add_init_script(path="libs/stealth.min.js")
+            # add a cookie attribute webId to avoid the appearance of a sliding captcha on the webpage
+            await self.browser_context.add_cookies([{
+                'name': "webId",
+                'value': "xxx123",  # any value
+                'domain': ".xiaohongshu.com",
+                'path': "/"
+            }])
+            self.context_page = await self.browser_context.new_page()
+            await self.context_page.goto(self.index_url, timeout=60000)
+            await asyncio.sleep(300)
+
     async def start(self) -> None:
         playwright_proxy_format, httpx_proxy_format = None, None
         if config.ENABLE_IP_PROXY:

@@ -144,6 +144,41 @@ async def login(login_info: XhsLoginInfo):
         }
 
 
+# 打开小红书控制台
+@app.post("/api/xhs/open_console")
+async def login(login_info: XhsLoginInfo):
+    global XHS_ACCOUNT_INFO
+    utils.logger.info(f"打开小红书控制台 login_info: {login_info}")
+    config.PLATFORM = "xhs"
+    config.LOGIN_TYPE = "qrcode"
+    config.CRAWLER_TYPE = "creator"
+    config.HEADLESS = login_info.headless
+    username = login_info.username
+    if username is None or username.strip() == '':
+        return {
+            "code": 1,
+            "msg": "未指定小红书账号",
+            "data": None
+        }
+    try:
+        crawler = XiaoHongShuCrawler()
+        crawler.set_username(username)
+        # 登录
+        await crawler.open_web()
+        return {
+            "code": 0,
+            "msg": "打开小红书控制台",
+            "data": f"{username} 打开小红书控制台成功"
+        }
+    except Exception as e:
+        utils.logger.error(f"打开小红书控制台失败: {e}")
+        return {
+            "code": 1,
+            "msg": str(e),
+            "data": None
+        }
+
+
 # 获取爬取数据
 @app.post("/api/xhs/crawler")
 async def handle_crawler_request(task_info: CrawlerTaskInfo):
