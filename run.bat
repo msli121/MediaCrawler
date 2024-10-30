@@ -1,8 +1,8 @@
 @echo off
 
 REM 定义目录路径
-set "REPO_PARENT_PATH=C:\Users\Administrator\Desktop"
-set "REPO_PATH=C:\Users\Administrator\Desktop\MediaCrawler"
+set "REPO_PARENT_PATH=%UserProfile%\Desktop"
+set "REPO_PATH=%UserProfile%\Desktop\MediaCrawler"
 
 REM 判断文件夹是否存在
 if exist "%REPO_PATH%" (
